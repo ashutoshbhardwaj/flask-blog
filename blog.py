@@ -1,6 +1,6 @@
 from flask import Flask,render_template,request,session,\
     flash,redirect,url_for,g
-
+from functools import  wraps
 import sqlite3
 import pdb
 
@@ -14,7 +14,19 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 
 def connect_db():
-    return sqlite.connect(app.config['DATABASE'])
+    return sqlite3.connect(app.config['DATABASE'])
+
+
+def login_required(test):
+    @wraps(test)
+    def wrap(*args,**kwargs):
+        if 'logged_in' in session:
+            return test(*args,**kwargs)
+        else:
+            flash("You need to be logged in first")
+            return redirect(url_for('login'))
+    return wrap
+
 
 @app.route('/',methods=['GET','POST'])
 def login():
@@ -37,9 +49,13 @@ def login():
 
 
 @app.route('/main')
+@login_required
 def main():
-    flash('You  are    logged  in')
-    return  render_template('main.html')
+    flash('You  are logged  in')
+    g.db=connect_db()
+    cursor=g.db.execute("select * from posts")
+    posts=[dict(title=row[0],post=row[1]) for row in cursor.fetchall()]
+    return render_template('main.html',posts=posts)
 
 
 @app.route('/logout')
